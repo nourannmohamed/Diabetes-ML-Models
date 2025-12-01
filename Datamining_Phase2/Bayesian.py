@@ -4,20 +4,18 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-# ----------------------------
-# Load dataset
-# ----------------------------
+
 print("=" * 70)
 print("LOADING DATA")
 print("=" * 70)
 
 df = pd.read_csv('DatasetofDiabetes.csv')
 
-# Drop duplicates (if any)
+
 df = df.drop_duplicates()
 print(f"Rows after dropping duplicates: {df.shape[0]}")
 
-# Numeric columns to check
+# Numeric columns to check (continuous features)
 numeric_cols = ['Urea', 'Cr', 'HbA1c', 'Chol', 'TG', 'HDL', 'LDL', 'VLDL', 'BMI']
 
 # ----------------------------
@@ -49,6 +47,48 @@ for col in numeric_cols:
 print(f"\nTotal outliers replaced across all numeric columns: {total_outliers}")
 
 # ----------------------------
+# Handle categorical feature: Gender
+# ----------------------------
+print("\n" + "=" * 70)
+print("CATEGORICAL FEATURE (GENDER) PREPROCESSING")
+print("=" * 70)
+
+# Clean Gender column (name might be 'Gender' or 'GENDER' depending on dataset)
+df['Gender'] = df['Gender'].astype(str).str.strip()
+
+# Clean display: before mapping
+print("\n--- Gender distribution BEFORE mapping ---")
+gender_counts = df['Gender'].value_counts(dropna=False)
+total_rows = len(df)
+for g, c in gender_counts.items():
+    pct = (c / total_rows) * 100
+    print(f"{str(g):>6} : {c:4d} samples ({pct:5.2f}%)")
+
+
+gender_map = {
+    'F': 0, 'Female': 0, 'female': 0, 'f': 0,
+    'M': 1, 'Male': 1, 'male': 1, 'm': 1
+}
+df['Gender_num'] = df['Gender'].map(gender_map)
+
+# If any unmapped values exist, show them and fill with mode
+if df['Gender_num'].isna().any():
+    print("\nWARNING: Some Gender values could not be mapped:")
+    print(df.loc[df['Gender_num'].isna(), 'Gender'].value_counts(dropna=False))
+    mode_gender = df['Gender_num'].mode()[0]
+    df['Gender_num'] = df['Gender_num'].fillna(mode_gender)
+    print(f"\nUnmapped Gender values filled with mode (Gender_num = {mode_gender}).")
+
+# Clean display: after mapping
+print("\n--- Gender distribution AFTER mapping (encoded) ---")
+gender_num_counts = df['Gender_num'].value_counts(dropna=False).sort_index()
+label_map_print = {0: "Female (0)", 1: "Male (1)"}
+for g_val, c in gender_num_counts.items():
+    label = label_map_print.get(g_val, f"{g_val}")
+    pct = (c / total_rows) * 100
+    print(f"{label:<10} : {c:4d} samples ({pct:5.2f}%)")
+
+# ----------------------------
 # Prepare data for Gaussian Naive Bayes
 # ----------------------------
 print("\n" + "=" * 70)
@@ -75,10 +115,14 @@ if y.isna().any():
 
 # Keep only rows with valid labels
 valid_mask = y.notna()
-X = df.loc[valid_mask, numeric_cols]
 y = y.loc[valid_mask].astype(int)
 
+# FEATURES = numeric features + encoded Gender
+feature_cols = numeric_cols + ['Gender_num']
+X = df.loc[valid_mask, feature_cols]
+
 print(f"\nFinal dataset size used for modeling: {X.shape[0]} samples")
+print("Feature columns used:", feature_cols)
 
 # ----------------------------
 # Train-test split
