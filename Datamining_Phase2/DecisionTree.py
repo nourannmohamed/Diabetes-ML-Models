@@ -351,6 +351,33 @@ print(f"Training Accuracy: {train_acc:.4f}")
 print(f"Testing  Accuracy: {test_acc:.4f}")
 print("=========================================")
 
+target_names = [
+    'Non-Diabetic (0)',
+    'Predict-Diabetic (1)',
+    'Diabetic (2)'
+]
+
+print("\nClassification Report:")
+print("-" * 70)
+print(classification_report(
+    y_test,
+    y_test_pred,
+    target_names=target_names,
+    digits=3
+))
+
+cm = confusion_matrix(y_test, y_test_pred)
+cm_df = pd.DataFrame(
+    cm,
+    index=[f"Actual {name}" for name in target_names],
+    columns=[f"Pred {name}" for name in target_names]
+)
+
+print("\nConfusion Matrix:")
+print("-" * 70)
+print(cm_df)
+print("-" * 70)
+
 # ============================================================
 # 10) ANALYSIS FOR: GENDER & AGE
 # ============================================================
