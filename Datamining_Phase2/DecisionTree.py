@@ -1,8 +1,13 @@
 import pandas as pd
 import numpy as np
-
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+
+import os
+os.environ["PATH"] += os.pathsep + r"C:\Program Files\Graphviz\bin"
+
+from graphviz import Digraph
+
 
 # ============================================================
 # 1) LOAD & BASIC CLEANING
@@ -195,6 +200,56 @@ def majority_class(y_vec):
     return values[np.argmax(counts)]
 
 
+# ================================================
+#  TREE VISUALIZATION USING GRAPHVIZ
+# ================================================
+from graphviz import Digraph
+
+CLASS_LABELS = {
+    0: "N (Non-diabetic)",
+    1: "P (Predict-diabetic)",
+    2: "Y (Diabetic)",
+}
+
+def visualize_tree(node, filename="ID3_diabetes_tree"):
+    """
+    Visualize the custom ID3 decision tree using Graphviz and save as PNG.
+    """
+    dot = Digraph()
+
+    def add_nodes_edges(node, parent_id=None, edge_label=""):
+        # Unique ID to avoid duplicate node names
+        node_id = str(id(node))
+
+        # If node is a leaf
+        if node.value is not None:
+            label = CLASS_LABELS.get(node.value, str(node.value))
+            dot.node(node_id, label,
+                     shape="box", style="filled", color="lightgreen")
+        else:
+            # Decision node
+            dot.node(node_id, f"{node.feature}",
+                     shape="ellipse", style="filled", color="lightblue")
+
+        # If not root, connect to parent
+        if parent_id is not None:
+            dot.edge(parent_id, node_id, label=str(edge_label))
+
+        # Recursively add child nodes
+        if node.value is None:
+            for val, child in node.children.items():
+                add_nodes_edges(child, node_id, edge_label=val)
+
+    # Build graph starting from the root
+    add_nodes_edges(node)
+
+    # Export as PNG
+    dot.render(filename, format="png", cleanup=True)
+    print(f"\nGraphical tree saved as: {filename}.png")
+
+
+
+
 def id3(X, y_vec, depth=0, max_depth=None):
     """
     ID3 recursive algorithm (for discrete attributes).
@@ -273,6 +328,7 @@ def predict_one(node, sample):
 def predict(tree, X):
     return np.array([predict_one(tree, X.iloc[i]) for i in range(len(X))])
 
+
 # ============================================================
 # 9) BUILD TREE & EVALUATE
 # ============================================================
@@ -281,6 +337,8 @@ print("TRAINING ID3 TREE (on discretized features)")
 print("=" * 70)
 
 tree = id3(X_train, y_train, max_depth=5)
+visualize_tree(tree, "ID3_diabetes_tree")
+
 
 y_train_pred = predict(tree, X_train)
 y_test_pred = predict(tree, X_test)
