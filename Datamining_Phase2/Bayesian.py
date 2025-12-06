@@ -77,7 +77,8 @@ print(y.value_counts())
 # ============================================================
 # 5. FEATURE MATRIX
 # ============================================================
-feature_cols = numeric_cols + ['Gender_num']
+feature_cols = numeric_cols + ['AGE', 'Gender_num']
+
 X = df[feature_cols]
 
 print("\n=== FINAL DATASET USED FOR MODEL ===")
