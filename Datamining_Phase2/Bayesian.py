@@ -11,16 +11,21 @@ print("=" * 70)
 
 df = pd.read_csv("DatasetofDiabetes.csv")
 
-#Drop Duplicates
+# ------------------------------------------------------------
+# DROP DUPLICATES
+# ------------------------------------------------------------
 df = df.drop(["ID", "No_Pation"], axis=1, errors="ignore")
 df = df.drop_duplicates()
 print(f"Rows after dropping duplicates: {df.shape[0]}")
 
-
-numeric_cols = [ 'Urea', 'Cr', 'HbA1c', 'Chol',
+# ------------------------------------------------------------
+# NUMERIC COLUMNS
+# ------------------------------------------------------------
+numeric_cols = ['Urea', 'Cr', 'HbA1c', 'Chol',
                 'TG', 'HDL', 'LDL', 'VLDL', 'BMI']
-feature_cols = numeric_cols + ['Gender']
 
+# ------------------------------------------------------------
+# OUTLIER HANDLING (IQR + Median Replacement)
 # ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("OUTLIER HANDLING (IQR + Median Replacement)")
@@ -33,6 +38,7 @@ for col in numeric_cols:
         continue
 
     df[col] = pd.to_numeric(df[col], errors='coerce')
+
     Q1 = df[col].quantile(0.25)
     Q3 = df[col].quantile(0.75)
     IQR = Q3 - Q1
@@ -49,76 +55,55 @@ for col in numeric_cols:
 
 print(f"\nTotal outliers replaced across numeric columns: {total_outliers}")
 
-
+# ------------------------------------------------------------
+# CATEGORICAL FEATURE (GENDER) PREPROCESSING - SIMPLE MAPPING
+# ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("CATEGORICAL FEATURE (GENDER) PREPROCESSING")
 print("=" * 70)
 
+# Clean and standardize gender text
+df['Gender'] = df['Gender'].astype(str).str.strip().str.upper()
 
-df['Gender'] = df['Gender'].astype(str).str.strip()
-
-
-print("\n--- Gender distribution BEFORE mapping ---")
-gender_counts = df['Gender'].value_counts(dropna=False)
-total_rows = len(df)
-for g, c in gender_counts.items():
-    pct = (c / total_rows) * 100
-    print(f"{str(g):>6} : {c:4d} samples ({pct:5.2f}%)")
-
-
+# Simple mapping to numeric
 gender_map = {
-    'F': 0, 'Female': 0, 'female': 0, 'f': 0,
-    'M': 1, 'Male': 1, 'male': 1, 'm': 1
+    'F': 0, 
+    'M': 1
 }
 df['Gender_num'] = df['Gender'].map(gender_map)
 
-if df['Gender_num'].isna().any():
-    print("\nWARNING: Some Gender values could not be mapped:")
-    print(df.loc[df['Gender_num'].isna(), 'Gender'].value_counts(dropna=False))
-    mode_gender = df['Gender_num'].mode()[0]
-    df['Gender_num'] = df['Gender_num'].fillna(mode_gender)
-    print(f"\nUnmapped Gender values filled with mode (Gender_num = {mode_gender}).")
-
-print("\n--- Gender distribution AFTER mapping (encoded) ---")
-gender_num_counts = df['Gender_num'].value_counts(dropna=False).sort_index()
-label_map_print = {0: "Female (0)", 1: "Male (1)"}
-for g_val, c in gender_num_counts.items():
-    label = label_map_print.get(g_val, f"{g_val}")
-    pct = (c / total_rows) * 100
-    print(f"{label:<10} : {c:4d} samples ({pct:5.2f}%)")
-
-
+# ------------------------------------------------------------
+# TARGET COLUMN (CLASS) PREPROCESSING
+# ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("TARGET COLUMN (CLASS) PREPROCESSING")
 print("=" * 70)
 
+# Clean and standardize CLASS values
+df['CLASS'] = df['CLASS'].astype(str).str.strip().str.upper()
 
-df['CLASS'] = df['CLASS'].astype(str).str.strip()
-
-print("\nUnique CLASS values after strip:")
-print(df['CLASS'].value_counts(dropna=False))
-
-
+# Map CLASS to numeric labels
 label_map = {'N': 0, 'P': 1, 'Y': 2}
-y = df['CLASS'].map(label_map)
+y = df['CLASS'].map(label_map).astype(int)
+
+# Show class distribution
+print("Class counts:")
+print(y.value_counts())
 
 
-if y.isna().any():
-    print("\nWARNING: Some CLASS values could not be mapped. Showing them:")
-    print(df.loc[y.isna(), 'CLASS'].value_counts(dropna=False))
-
-
-valid_mask = y.notna()
-y = y.loc[valid_mask].astype(int)
-
-
+# ------------------------------------------------------------
+# FEATURE MATRIX
+# ------------------------------------------------------------
 feature_cols = numeric_cols + ['Gender_num']
-X = df.loc[valid_mask, feature_cols]
+X = df[feature_cols]
+
 
 print(f"\nFinal dataset size used for modeling: {X.shape[0]} samples")
 print("Feature columns used:", feature_cols)
 
-
+# ------------------------------------------------------------
+# TRAIN / TEST SPLIT
+# ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("TRAIN / TEST SPLIT")
 print("=" * 70)
@@ -127,13 +112,15 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y,
     test_size=0.2,
     random_state=42,
-    stratify=y     
+    stratify=y
 )
 
 print(f"Training samples: {X_train.shape[0]}")
 print(f"Testing  samples: {X_test.shape[0]}")
 
-
+# ------------------------------------------------------------
+# TRAINING GAUSSIAN NAIVE BAYES MODEL
+# ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("TRAINING GAUSSIAN NAIVE BAYES MODEL")
 print("=" * 70)
@@ -141,17 +128,17 @@ print("=" * 70)
 gnb = GaussianNB()
 gnb.fit(X_train, y_train)
 
-
+# ------------------------------------------------------------
+# MODEL EVALUATION
+# ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("MODEL EVALUATION")
 print("=" * 70)
 
 y_pred = gnb.predict(X_test)
 
-
 acc = accuracy_score(y_test, y_pred)
 print(f"\nAccuracy: {acc:.4f}")
-
 
 target_names = ['Non-Diabetic (0)', 'Predict-Diabetic (1)', 'Diabetic (2)']
 
@@ -163,7 +150,6 @@ print(classification_report(
     target_names=target_names,
     digits=3
 ))
-
 
 cm = confusion_matrix(y_test, y_pred)
 cm_df = pd.DataFrame(
