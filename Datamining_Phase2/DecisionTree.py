@@ -13,15 +13,14 @@ print("=" * 70)
 
 df = pd.read_csv("DatasetofDiabetes.csv")
 
-# Drop duplicates
+#Drop Duplicates
+df = df.drop(["ID", "No_Pation"], axis=1, errors="ignore")
 df = df.drop_duplicates()
 print(f"Rows after dropping duplicates: {df.shape[0]}")
 
 # Continuous numeric features
-numeric_cols = ['AGE', 'Urea', 'Cr', 'HbA1c', 'Chol',
+numeric_cols = ['Urea', 'Cr', 'HbA1c', 'Chol',
                 'TG', 'HDL', 'LDL', 'VLDL', 'BMI']
-
-feature_cols = numeric_cols + ['Gender']
 
 # ------------------------------------------------------------
 #OUTLIER HANDLING (IQR + median)
@@ -67,10 +66,32 @@ df['Gender'] = df['Gender'].map({'M': 1, 'F': 2})
 print(df['Gender'].value_counts(dropna=False))
 
 # ============================================================
-#BUILD CONTINUOUS MATRIX
+# MANUAL AGE GROUPING (AGE_GROUP: 0=Young, 1=30-44, 2=45-59, 3=60+)
+
+print("\n" + "=" * 70)
+print("AGE GROUPING (Manual Bins)")
+print("=" * 70)
+
+age_bins = [0, 30, 45, 60, np.inf]
+age_labels = [0, 1, 2, 3]  # numeric codes for the model
+
+df['AGE_GROUP'] = pd.cut(
+    df['AGE'],
+    bins=age_bins,
+    labels=age_labels,
+    right=False,          # [(0,30), (30,45), (45,60), (60,∞)]
+    include_lowest=True
+)
+
+print("AGE_GROUP value counts:")
+print(df['AGE_GROUP'].value_counts(dropna=False))
+
+# ============================================================
+# BUILD CONTINUOUS MATRIX (ONLY LAB VALUES, NO AGE)
 
 X_numeric = df[numeric_cols].copy()
 gender_col = df['Gender'].copy()
+age_group_col = df['AGE_GROUP'].cat.codes.copy()  #.cat.codes turns it into integers
 
 print(f"\nFinal dataset size: {len(df)} samples")
 
@@ -91,8 +112,8 @@ X_disc_numeric = pd.DataFrame(
 print("\nSample after KBins discretization:")
 print(X_disc_numeric.head())
 
-# Add gender (not discretized)
 X_final = X_disc_numeric.copy()
+X_final["AGE_GROUP"] = age_group_col.values
 X_final["Gender"] = gender_col.values
 
 # ============================================================
@@ -117,8 +138,8 @@ dt = DecisionTreeClassifier(
     criterion='entropy',
     random_state=42,
     max_depth=5,
-    min_samples_split=10,
-    min_samples_leaf=5
+    min_samples_split=10,       #Prevents the tree from creating branches based on tiny, unreliable subsets.
+    min_samples_leaf=5          #A leaf node must contain at least 5 samples.Ensures each final class prediction is based on enough data.
 )
 
 dt.fit(X_train, y_train)
@@ -148,15 +169,73 @@ cm_df = pd.DataFrame(cm,
                      columns=["Pred 0", "Pred 1", "Pred 2"])
 print("\nConfusion Matrix:")
 print(cm_df)
-# ============================================================
-#VISUALIZE THE DECISION TREE
 
 print("\n" + "=" * 70)
 print("PLOTTING THE DECISION TREE")
 print("=" * 70)
 
-plt.figure(figsize=(30, 20))   # much wider and taller
+# ============================================================
+# ANALYSIS: AGE & GENDER VS DIABETES
+print("\n" + "=" * 70)
+print("AGE & GENDER DIABETES ANALYSIS")
+print("=" * 70)
 
+# --------------------------
+# AGE GROUP ANALYSIS (<40 vs ≥40) USING ENCODED y (0,1,2)
+# --------------------------
+age_threshold = 40
+young_mask = df['AGE'] < age_threshold
+old_mask   = df['AGE'] >= age_threshold
+
+young_y = y[young_mask]
+old_y   = y[old_mask]
+
+young_pct = young_y.value_counts(normalize=True) * 100
+old_pct   = old_y.value_counts(normalize=True) * 100
+
+print(f"\nDiabetes distribution among YOUNG people (< {age_threshold}):")
+for cls, pct in young_pct.items():
+    label = {0: "Non-Diabetic (0)", 1: "Pre-Diabetic (1)", 2: "Diabetic (2)"}[cls]
+    print(f"  {label}: {pct:.2f}%")
+
+print(f"\nDiabetes distribution among OLDER people (≥ {age_threshold}):")
+for cls, pct in old_pct.items():
+    label = {0: "Non-Diabetic (0)", 1: "Pre-Diabetic (1)", 2: "Diabetic (2)"}[cls]
+    print(f"  {label}: {pct:.2f}%")
+
+# % of younger people who are diabetic (class 2)
+if 2 in young_pct.index:
+    print(f"\nPercentage of YOUNGER people diagnosed as Diabetic (Class 2): {young_pct[2]:.2f}%")
+else:
+    print("\nNo younger people fall in Diabetic class (Class 2) in the dataset.")
+
+# --------------------------
+# GENDER ANALYSIS (Male vs Female) USING ENCODED y
+# --------------------------
+
+gender_pct = pd.crosstab(df['Gender'], y, normalize='index') * 100
+print("\nDiabetes percentage by GENDER (rows = Gender, cols = Class 0/1/2):")
+print(gender_pct.round(2))
+
+# Male = 1, Female = 2, class 2 = diabetic
+male_pct    = gender_pct.loc[1, 2] if (1 in gender_pct.index and 2 in gender_pct.columns) else None
+female_pct  = gender_pct.loc[2, 2] if (2 in gender_pct.index and 2 in gender_pct.columns) else None
+
+if male_pct is not None and female_pct is not None:
+    print(f"\nPercentage of MALES who are diabetic (Class 2):   {male_pct:.2f}%")
+    print(f"Percentage of FEMALES who are diabetic (Class 2): {female_pct:.2f}%")
+
+    if female_pct > male_pct:
+        print("\nAccording to the dataset, WOMEN are more prone to diabetes.")
+    elif male_pct > female_pct:
+        print("\nAccording to the dataset, MEN are more prone to diabetes.")
+    else:
+        print("\nBoth genders show equal diabetes percentage.")
+else:
+    print("\nGender analysis could not be completed due to missing data.")
+
+
+plt.figure(figsize=(30, 20))  
 tree.plot_tree(
     dt,
     feature_names=X_final.columns.tolist(),
