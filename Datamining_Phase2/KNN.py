@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import  train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.metrics import precision_score, recall_score, f1_score
@@ -227,6 +227,28 @@ plt.ylim(0, 1)
 plt.legend()
 plt.grid(axis='y', linestyle='--', alpha=0.5)
 plt.show()
+
+#####Check overfitting with Train vs Test accuracies and Cross-Validation#####
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import Pipeline
+# =============================
+# Train vs Test Accuracies (check overfitting)
+# =============================
+print("\n" + "=" * 70)
+print("Train vs Test Accuracies")
+train_acc = best_knn.score(X_train_scaled, y_train)
+test_acc = best_knn.score(X_test_scaled, y_test)
+print("Train accuracy:", train_acc)
+print("Test accuracy : ", test_acc)
+
+# Cross-validation (use pipeline so scaling is included)
+print("\nCross Validation (StratifiedKFold) accuracies:")
+pipeline = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsClassifier(n_neighbors=best_k))])
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(pipeline, X, y, cv=cv, scoring='accuracy', n_jobs=-1)
+print(scores)
+print("Mean Accuracy:", scores.mean())
+
 
 
 # =============================
