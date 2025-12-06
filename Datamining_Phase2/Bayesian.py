@@ -9,23 +9,30 @@ print("=" * 70)
 print("LOADING DATA")
 print("=" * 70)
 
-df = pd.read_csv('DatasetofDiabetes.csv')
+df = pd.read_csv("DatasetofDiabetes.csv")
 
-
+#Drop Duplicates
+df = df.drop(["ID", "No_Pation"], axis=1, errors="ignore")
 df = df.drop_duplicates()
 print(f"Rows after dropping duplicates: {df.shape[0]}")
 
 
-numeric_cols = ['Urea', 'Cr', 'HbA1c', 'Chol', 'TG', 'HDL', 'LDL', 'VLDL', 'BMI']
+numeric_cols = [ 'Urea', 'Cr', 'HbA1c', 'Chol',
+                'TG', 'HDL', 'LDL', 'VLDL', 'BMI']
+feature_cols = numeric_cols + ['Gender']
 
-
+# ------------------------------------------------------------
 print("\n" + "=" * 70)
 print("OUTLIER HANDLING (IQR + Median Replacement)")
 print("=" * 70)
 
 total_outliers = 0
-
 for col in numeric_cols:
+    if col not in df.columns:
+        print(f"Skipping missing numeric column: {col}")
+        continue
+
+    df[col] = pd.to_numeric(df[col], errors='coerce')
     Q1 = df[col].quantile(0.25)
     Q3 = df[col].quantile(0.75)
     IQR = Q3 - Q1
@@ -34,15 +41,13 @@ for col in numeric_cols:
     median = df[col].median()
 
     outlier_mask = (df[col] < lower) | (df[col] > upper)
-    outlier_count = outlier_mask.sum()
+    outlier_count = int(outlier_mask.sum())
     total_outliers += outlier_count
 
-
     df.loc[outlier_mask, col] = median
+    print(f"{col:<6}: {outlier_count:3d} outliers replaced with median = {median}")
 
-    print(f"{col:<6}: {outlier_count:3d} outliers replaced with median value = {median:.2f}")
-
-print(f"\nTotal outliers replaced across all numeric columns: {total_outliers}")
+print(f"\nTotal outliers replaced across numeric columns: {total_outliers}")
 
 
 print("\n" + "=" * 70)
